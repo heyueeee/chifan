@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今天吃什么？转盘决定！</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 50%, #f7b731 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+  }
+
+  h1 {
+    color: #fff;
+    font-size: 34px;
+    text-shadow: 0 3px 8px rgba(0,0,0,.25);
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+  }
+  .subtitle { color: rgba(255,255,255,.9); font-size: 15px; margin-bottom: 22px; }
+
+  /* 餐别标签页 */
+  .tabs {
+    display: flex;
+    background: rgba(255,255,255,.25);
+    border-radius: 40px;
+    padding: 6px;
+    gap: 6px;
+    margin-bottom: 26px;
+    backdrop-filter: blur(6px);
+  }
+  .tab {
+    border: none;
+    background: transparent;
+    color: #fff;
+    font-size: 17px;
+    padding: 10px 26px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all .25s;
+    font-family: inherit;
+  }
+  .tab:hover { background: rgba(255,255,255,.2); }
+  .tab.active { background: #fff; color: #ff6b4a; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+
+  .main { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+
+  /* 转盘区域 */
+  .wheel-area { position: relative; text-align: center; }
+  .wheel-wrap { position: relative; width: 420px; height: 460px; margin: 0 auto; }
+
+  .pointer {
+    position: absolute;
+    top: -6px; left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 34px solid #d63031;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.3));
+    z-index: 5;
+  }
+  .pointer::after {
+    content: "";
+    position: absolute;
+    top: -32px; left: -9px;
+    width: 18px; height: 18px;
+    background: #d63031;
+    border-radius: 50%;
+    box-shadow: inset 0 -2px 3px rgba(0,0,0,.25);
+  }
+
+  canvas { display: block; margin: 14px auto 0; }
+
+  .spin-btn {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 92px; height: 92px;
+    border-radius: 50%;
+    border: 6px solid #fff;
+    background: linear-gradient(145deg, #ff6b4a, #e84343);
+    color: #fff;
+    font-size: 19px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 4;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3);
+    transition: transform .15s;
+    font-family: inherit;
+    letter-spacing: 1px;
+  }
+  .spin-btn:hover:not(:disabled) { transform: translate(-50%, -50%) scale(1.07); }
+  .spin-btn:disabled { opacity: .7; cursor: not-allowed; }
+
+  /* 菜单编辑区域 */
+  .menu-panel {
+    background: #fff;
+    border-radius: 18px;
+    padding: 22px;
+    width: 340px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.18);
+  }
+  .menu-panel h2 {
+    font-size: 19px;
+    color: #333;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .menu-panel .tip { font-size: 12px; color: #999; margin-bottom: 14px; }
+
+  .food-list { max-height: 300px; overflow-y: auto; margin-bottom: 12px; }
+  .food-list::-webkit-scrollbar { width: 6px; }
+  .food-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+
+  .food-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .food-item .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .food-item input {
+    flex: 1;
+    border: 1px solid #eee;
+    background: #f8f8f8;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    color: #444;
+    outline: none;
+    transition: all .2s;
+    font-family: inherit;
+  }
+  .food-item input:focus { border-color: #ff6b4a; background: #fff; box-shadow: 0 0 0 2px rgba(255,107,74,.15); }
+  .food-item .del {
+    border: none;
+    background: #ffeaea;
+    color: #e84343;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 15px;
+    flex-shrink: 0;
+    transition: all .2s;
+    line-height: 1;
+  }
+  .food-item .del:hover { background: #e84343; color: #fff; }
+
+  .add-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .add-row input {
+    flex: 1;
+    border: 2px dashed #ffb199;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+  }
+  .add-row input:focus { border-color: #ff6b4a; border-style: solid; }
+  .add-row button {
+    border: none;
+    background: #ff6b4a;
+    color: #fff;
+    border-radius: 8px;
+    padding: 0 16px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: opacity .2s;
+  }
+  .add-row button:hover { opacity: .88; }
+
+  .panel-footer { display: flex; justify-content: space-between; align-items: center; }
+  .panel-footer .count { font-size: 13px; color: #999; }
+  .reset-btn {
+    border: none;
+    background: #fff0f0;
+    color: #e84343;
+    font-size: 13px;
+    padding: 7px 13px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all .2s;
+    font-family: inherit;
+  }
+  .reset-btn:hover { background: #ffe3e3; }
+
+  .empty-tip { color: #bbb; font-size: 14px; text-align: center; padding: 30px 0; }
+
+  /* 结果弹窗 */
+  .result-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+    backdrop-filter: blur(3px);
+  }
+  .result-overlay.show { display: flex; animation: fadeIn .25s; }
+  .result-card {
+    background: #fff;
+    border-radius: 22px;
+    padding: 38px 46px;
+    text-align: center;
+    box-shadow: 0 16px 50px rgba(0,0,0,.35);
+    animation: pop .4s cubic-bezier(.2,1.6,.4,1);
+    max-width: 86vw;
+  }
+  .result-card .emoji { font-size: 52px; }
+  .result-card .label { color: #888; font-size: 15px; margin: 10px 0 6px; }
+  .result-card .food-name {
+    font-size: 34px;
+    font-weight: bold;
+    color: #ff5233;
+    margin-bottom: 22px;
+    word-break: break-all;
+  }
+  .result-card .btns { display: flex; gap: 12px; justify-content: center; }
+  .result-card button {
+    border: none;
+    border-radius: 30px;
+    padding: 11px 26px;
+    font-size: 15px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .2s;
+  }
+  .btn-again { background: #ff6b4a; color: #fff; }
+  .btn-again:hover { transform: scale(1.05); }
+  .btn-ok { background: #f0f0f0; color: #666; }
+  .btn-ok:hover { background: #e4e4e4; }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { from { transform: scale(.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  footer { margin-top: 34px; color: rgba(255,255,255,.75); font-size: 13px; }
+
+  @media (max-width: 860px) {
+    .wheel-wrap { width: 320px; height: 360px; }
+    canvas { width: 320px !important; height: 320px !important; }
+    .spin-btn { width: 76px; height: 76px; font-size: 16px; }
+    h1 { font-size: 26px; }
+    .tab { padding: 9px 16px; font-size: 15px; }
+    .menu-panel { width: 100%; max-width: 420px; }
+    .food-list { max-height: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>🍜 今天吃什么？</h1>
+<p class="subtitle">转动转盘，让命运替你决定这一餐！</p>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-meal="breakfast">🌅 早饭</button>
+  <button class="tab" data-meal="lunch">☀️ 午饭</button>
+  <button class="tab" data-meal="dinner">🌙 晚饭</button>
+</div>
+
+<div class="main">
+  <div class="wheel-area">
+    <div class="wheel-wrap">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="420" height="420"></canvas>
+      <button class="spin-btn" id="spinBtn">开始<br>抽取</button>
+    </div>
+  </div>
+
+  <div class="menu-panel">
+    <h2>📋 <span id="panelTitle">早饭菜单</span></h2>
+    <p class="tip">点击文字可直接修改，点 × 删除；修改会自动保存到本地</p>
+    <div class="food-list" id="foodList"></div>
+    <div class="add-row">
+      <input type="text" id="addInput" placeholder="输入想吃的，如：火锅" maxlength="12">
+      <button id="addBtn">添加</button>
+    </div>
+    <div class="panel-footer">
+      <span class="count" id="countTip"></span>
+      <button class="reset-btn" id="resetBtn">↺ 恢复默认</button>
+    </div>
+  </div>
+</div>
+
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-card">
+    <div class="emoji" id="resultEmoji">🎉</div>
+    <div class="label" id="resultLabel">今天的早饭就决定是它啦！</div>
+    <div class="food-name" id="resultFood"></div>
+    <div class="btns">
+      <button class="btn-again" id="againBtn">🎁 再抽一次</button>
+      <button class="btn-ok" id="okBtn">就吃它！</button>
+    </div>
+  </div>
+</div>
+
+<footer>💡 数据保存在你的浏览器中，每个餐别的菜单都可以按自己的喜好随意修改</footer>
+
+<script>
+/* ================= 默认菜单 ================= */
+const DEFAULT_FOODS = {
+  breakfast: ['包子豆浆', '油条', '煎饼果子', '小米粥', '鸡蛋灌饼', '三明治', '牛奶面包', '小笼包'],
+  lunch:     ['黄焖鸡米饭', '麻辣香锅', '兰州拉面', '饺子', '红烧肉盖饭', '汉堡炸鸡', '沙县小吃', '肥牛饭'],
+  dinner:    ['火锅', '烤肉', '螺蛳粉', '炒饭', '日料寿司', '披萨', '酸菜鱼', '粥配小菜']
+};
+const MEAL_NAMES = { breakfast: '早饭', lunch: '午饭', dinner: '晚饭' };
+const STORE_PREFIX = 'mealWheel.';
+
+/* ================= 状态 ================= */
+const COLORS = ['#ff6b6b', '#f7b731', '#4ecdc4', '#a29bfe', '#fd79a8', '#00b894',
+                '#e17055', '#6c5ce7', '#e84343', '#0984e3', '#fdcb6e', '#d63031'];
+
+let activeMeal = 'breakfast';
+let rotation = 0;          // 当前餐别转盘的累计旋转角度（弧度）
+let spinning = false;
+
+const canvas = document.getElementById('wheel');
+const ctx = canvas.getContext('2d');
+const SIZE = 420, CENTER = SIZE / 2, R_OUT = SIZE / 2 - 8;
+
+/* ================= 数据读写 ================= */
+function loadFoods(meal) {
+  try {
+    const raw = localStorage.getItem(STORE_PREFIX + meal);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr) && arr.length) return arr.map(String);
+    }
+  } catch (e) {}
+  return [...DEFAULT_FOODS[meal]];
+}
+function saveFoods(meal, foods) {
+  try { localStorage.setItem(STORE_PREFIX + meal, JSON.stringify(foods)); } catch (e) {}
+}
+
+/* ================= 转盘绘制 ================= */
+function drawWheel() {
+  const foods = loadFoods(activeMeal);
+  ctx.clearRect(0, 0, SIZE, SIZE);
+
+  // 外圈装饰
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, R_OUT + 6, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  const n = foods.length;
+  if (n === 0) {
+    ctx.beginPath();
+    ctx.arc(CENTER, CENTER, R_OUT, 0, Math.PI * 2);
+    ctx.fillStyle = '#dfe6e9';
+    ctx.fill();
+    ctx.fillStyle = '#999';
+    ctx.font = 'bold 20px "Microsoft YaHei"';
+    ctx.textAlign = 'center';
+    ctx.fillText('先添加几个选项吧～', CENTER, CENTER + 7);
+    return;
+  }
+
+  const seg = Math.PI * 2 / n;
+  ctx.save();
+  ctx.translate(CENTER, CENTER);
+  ctx.rotate(rotation);
+
+  for (let i = 0; i < n; i++) {
+    const start = i * seg;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.arc(0, 0, R_OUT, start, start + seg);
+    ctx.closePath();
+    ctx.fillStyle = COLORS[i % COLORS.length];
+    ctx.fill();
+    // 分隔线
+    ctx.strokeStyle = 'rgba(255,255,255,.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // 文字
+    ctx.save();
+    ctx.rotate(start + seg / 2);
+    ctx.textAlign = 'right';
+    let fontSize = n > 10 ? 14 : 17;
+    ctx.font = `bold ${fontSize}px "Microsoft YaHei"`;
+    let label = foods[i];
+    while (ctx.measureText(label).width > R_OUT - 70 && fontSize > 10) {
+      fontSize--;
+      ctx.font = `bold ${fontSize}px "Microsoft YaHei"`;
+    }
+    while (ctx.measureText(label).width > R_OUT - 70 && label.length > 2) {
+      label = label.slice(0, label.length - 2) + '…';
+    }
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,.3)';
+    ctx.shadowBlur = 3;
+    ctx.fillText(label, R_OUT - 16, 6);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // 中心圆盘（覆盖在扇形之上）
+  ctx.beginPath();
+  ctx.arc(CENTER, CENTER, 56, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,.08)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+/* ================= 抽奖动画 ================= */
+function spin() {
+  if (spinning) return;
+  const foods = loadFoods(activeMeal);
+  if (foods.length === 0) { alert('请先在右侧菜单添加至少一个选项～'); return; }
+
+  spinning = true;
+  document.getElementById('spinBtn').disabled = true;
+  setEditingDisabled(true);
+
+  const n = foods.length;
+  const seg = Math.PI * 2 / n;
+  const k = Math.floor(Math.random() * n);          // 目标扇区
+  const offset = seg * (0.18 + Math.random() * 0.64); // 落点在扇区内的随机位置
+  const POINTER = -Math.PI / 2;                      // 指针在正上方
+
+  // 目标旋转角：保证指针指向第 k 个扇区
+  let target = POINTER - (k * seg + offset);
+  target = ((target % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  while (target < rotation + Math.PI * 2 * 4) target += Math.PI * 2; // 至少转 4 圈
+
+  const startRot = rotation;
+  const delta = target - rotation;
+  const duration = 4200;
+  const startTime = performance.now();
+
+  function frame(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 4); // easeOutQuart：先快后慢
+    rotation = startRot + delta * ease;
+    drawWheel();
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      rotation = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      spinning = false;
+      document.getElementById('spinBtn').disabled = false;
+      setEditingDisabled(false);
+      showResult(foods[k]);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= 结果弹窗 ================= */
+function showResult(food) {
+  document.getElementById('resultLabel').textContent = `今天的${MEAL_NAMES[activeMeal]}就决定是它啦！`;
+  document.getElementById('resultFood').textContent = food;
+  document.getElementById('resultEmoji').textContent = ['🎉', '🥳', '✨', '🎊'][Math.floor(Math.random() * 4)];
+  document.getElementById('resultOverlay').classList.add('show');
+}
+document.getElementById('okBtn').onclick = () =>
+  document.getElementById('resultOverlay').classList.remove('show');
+document.getElementById('resultOverlay').onclick = e => {
+  if (e.target === e.currentTarget) e.currentTarget.classList.remove('show');
+};
+document.getElementById('againBtn').onclick = () => {
+  document.getElementById('resultOverlay').classList.remove('show');
+  setTimeout(spin, 300);
+};
+
+/* ================= 菜单编辑 ================= */
+function renderFoodList() {
+  const foods = loadFoods(activeMeal);
+  const list = document.getElementById('foodList');
+  list.innerHTML = '';
+
+  if (foods.length === 0) {
+    list.innerHTML = '<div class="empty-tip">菜单空空如也，先添加点好吃的吧～</div>';
+  }
+
+  foods.forEach((food, i) => {
+    const row = document.createElement('div');
+    row.className = 'food-item';
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = COLORS[i % COLORS.length];
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = food;
+    input.maxLength = 12;
+    input.addEventListener('input', () => {
+      const cur = loadFoods(activeMeal);
+      cur[i] = input.value.trim();
+      saveFoods(activeMeal, cur);
+      drawWheel();
+      updateCount();
+    });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = '删除';
+    del.onclick = () => {
+      const cur = loadFoods(activeMeal);
+      cur.splice(i, 1);
+      saveFoods(activeMeal, cur);
+      renderFoodList();
+      drawWheel();
+    };
+
+    row.append(dot, input, del);
+    list.appendChild(row);
+  });
+
+  updateCount();
+}
+
+function updateCount() {
+  const foods = loadFoods(activeMeal);
+  document.getElementById('countTip').textContent = `共 ${foods.length} 个选项`;
+}
+
+function addFood() {
+  const input = document.getElementById('addInput');
+  const v = input.value.trim();
+  if (!v) return;
+  const foods = loadFoods(activeMeal);
+  if (foods.includes(v)) { alert('这个选项已经在菜单里啦～'); return; }
+  foods.push(v);
+  saveFoods(activeMeal, foods);
+  input.value = '';
+  renderFoodList();
+  drawWheel();
+}
+document.getElementById('addBtn').onclick = addFood;
+document.getElementById('addInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addFood();
+});
+
+document.getElementById('resetBtn').onclick = () => {
+  if (!confirm(`确定把「${MEAL_NAMES[activeMeal]}」菜单恢复为默认吗？`)) return;
+  saveFoods(activeMeal, [...DEFAULT_FOODS[activeMeal]]);
+  renderFoodList();
+  drawWheel();
+};
+
+function setEditingDisabled(disabled) {
+  document.querySelectorAll('#foodList input, #foodList .del, #addInput, #addBtn, #resetBtn')
+    .forEach(el => el.disabled = disabled);
+}
+
+/* ================= 标签页切换 ================= */
+document.getElementById('tabs').addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (!tab || spinning) return;
+  if (tab.dataset.meal === activeMeal) return;
+
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  activeMeal = tab.dataset.meal;
+  rotation = 0; // 每个餐别转盘归零
+
+  document.getElementById('panelTitle').textContent = MEAL_NAMES[activeMeal] + '菜单';
+  renderFoodList();
+  drawWheel();
+});
+
+/* ================= 初始化 ================= */
+document.getElementById('spinBtn').onclick = spin;
+renderFoodList();
+drawWheel();
+</script>
+</body>
+</html>
